@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Campus break activity picker</title>
+  <style>
+    :root { color-scheme: light; font: 16px/1.5 system-ui, sans-serif; color: #20352d; background: #f4f5ef; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 1rem; }
+    main { max-width: 42rem; margin: 2rem auto; padding: clamp(1rem, 5vw, 2rem); background: white; border: 1px solid #d8dfd8; border-radius: 1rem; box-shadow: 0 8px 28px #20352d12; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+    h1 { font-size: clamp(1.5rem, 5vw, 2rem); margin:0; }
+    .fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(10rem,1fr)); gap:1rem; margin:1.5rem 0; }
+    label { display:grid; gap:.35rem; font-weight:650; }
+    select, button { min-height:2.8rem; padding:.55rem .75rem; border:1px solid #9aa99e; border-radius:.55rem; background:white; color:inherit; font:inherit; }
+    button { cursor:pointer; font-weight:650; }
+    button:focus-visible, select:focus-visible { outline:3px solid #e0a83a; outline-offset:2px; }
+    .primary { background:#245d49; color:white; border-color:#245d49; }
+    .actions { display:flex; flex-wrap:wrap; gap:.65rem; }
+    #result { margin:1.2rem 0; padding:1rem; border-radius:.7rem; background:#edf4ee; min-height:4rem; }
+    #result h2 { margin:.1rem 0 .6rem; font-size:1.25rem; }
+    .notice { color:#49584f; font-size:.92rem; }
+    #history { padding-left:1.5rem; }
+    #history li { margin:.4rem 0; }
+    .section-title { margin-top:1.7rem; }
+    @media (max-width: 25rem) { body { padding:.5rem; } main { margin:.5rem auto; } header { align-items:flex-start; } }
+  </style>
+</head>
+<body>
+<main>
+  <header><h1 id="title"></h1><button id="language" type="button" aria-label="Switch language"></button></header>
+  <p id="disclaimer" class="notice"></p>
+  <div class="fields">
+    <label><span id="location-label"></span><select id="location"></select></label>
+    <label><span id="time-label"></span><select id="time"></select></label>
+    <label><span id="energy-label"></span><select id="energy"></select></label>
+  </div>
+  <div class="actions">
+    <button class="primary" id="pick" type="button"></button>
+    <button id="reset" type="button"></button>
+  </div>
+  <section id="result" aria-live="polite"></section>
+  <section><h2 class="section-title" id="history-title"></h2><ol id="history"></ol><button id="clear" type="button"></button></section>
+</main>
+<script>
+const activities = [
+  {id:'A01', name_zh:'整理書包', name_en:'Organize your bag', location_type:'indoor', minutes:10, energy:'low'},
+  {id:'A02', name_zh:'畫一張小卡', name_en:'Draw a small card', location_type:'indoor', minutes:15, energy:'low'},
+  {id:'A03', name_zh:'寫三句讀書筆記', name_en:'Write three study notes', location_type:'indoor', minutes:10, energy:'low'},
+  {id:'A04', name_zh:'安靜讀兩頁書', name_en:'Read two pages quietly', location_type:'indoor', minutes:15, energy:'low'},
+  {id:'A05', name_zh:'排好明日待辦', name_en:'Plan tomorrow’s tasks', location_type:'indoor', minutes:20, energy:'low'},
+  {id:'A06', name_zh:'整理本機練習檔', name_en:'Organize practice files', location_type:'indoor', minutes:30, energy:'medium'},
+  {id:'A07', name_zh:'在合適位置慢走', name_en:'Take a gentle walk in a suitable area', location_type:'outdoor', minutes:15, energy:'low'},
+  {id:'A08', name_zh:'觀察天空並畫草圖', name_en:'Observe the sky and sketch', location_type:'outdoor', minutes:20, energy:'low'},
+  {id:'A09', name_zh:'在合適位置快走', name_en:'Take a brisk walk in a suitable area', location_type:'outdoor', minutes:30, energy:'medium'},
+  {id:'A10', name_zh:'規劃小組練習', name_en:'Plan a group exercise', location_type:'indoor', minutes:45, energy:'medium'},
+  {id:'A11', name_zh:'記錄自然色彩', name_en:'Record colors in nature', location_type:'outdoor', minutes:45, energy:'low'},
+  {id:'A12', name_zh:'構思下一次社團活動', name_en:'Brainstorm a future club activity', location_type:'indoor', minutes:60, energy:'medium'}
+];
+const text = {
+  en: { title:'What can I do between classes?', disclaimer:'Fictional teaching activities; not an official university announcement.', language:'中文', location:'Location', time:'Available time', energy:'Energy', all:'All', indoor:'Indoor', outdoor:'Outdoor', low:'Low', medium:'Medium', minutes:n=>`${n} minutes`, pick:'Pick an activity', reset:'Reset filters', history:'Recent picks', clear:'Clear history', none:'No matching activities.', empty:'No picks yet.', details:a=>`${a.id} · ${a.minutes} min · ${a.location_type} · ${a.energy}` },
+  zh: { title:'下課空檔可以做什麼？', disclaimer:'教學用虛構活動；不是大學官方公告。', language:'English', location:'地點', time:'可用時間', energy:'體力', all:'全部', indoor:'室內', outdoor:'戶外', low:'低', medium:'中', minutes:n=>`${n} 分鐘`, pick:'幫我選一個活動', reset:'重設篩選', history:'最近選擇', clear:'清除紀錄', none:'沒有符合條件的活動。', empty:'還沒有選擇紀錄。', details:a=>`${a.id} · ${a.minutes} 分鐘 · ${a.location_type==='indoor'?'室內':'戶外'} · ${a.energy==='low'?'低體力':'中體力'}` }
+};
+let lang='en', history=[];
+const $=id=>document.getElementById(id);
+function option(value,label){const o=document.createElement('option');o.value=value;o.textContent=label;return o;}
+function populate(select,items,value){select.replaceChildren(...items);select.value=value;}
+function render(){
+  const t=text[lang]; document.documentElement.lang=lang==='en'?'en':'zh-Hant';
+  $('title').textContent=t.title; $('disclaimer').textContent=t.disclaimer; $('language').textContent=t.language;
+  $('language').setAttribute('aria-label',lang==='en'?'Switch to Chinese':'切換為英文');
+  $('location-label').textContent=t.location; $('time-label').textContent=t.time; $('energy-label').textContent=t.energy;
+  populate($('location'),[option('all',t.all),option('indoor',t.indoor),option('outdoor',t.outdoor)],$('location').value||'all');
+  populate($('time'),[15,30,60].map(n=>option(String(n),t.minutes(n))),$('time').value||'30');
+  populate($('energy'),[option('all',t.all),option('low',t.low),option('medium',t.medium)],$('energy').value||'all');
+  $('pick').textContent=t.pick; $('reset').textContent=t.reset; $('history-title').textContent=t.history; $('clear').textContent=t.clear;
+  renderHistory();
+}
+function renderHistory(){const t=text[lang],list=$('history');list.replaceChildren();
+  if(!history.length){const li=document.createElement('li');li.textContent=t.empty;list.append(li);return;}
+  for(const a of history){const li=document.createElement('li');li.textContent=`${a.id} · ${a[lang==='en'?'name_en':'name_zh']} · ${t.details(a)}`;list.append(li);}
+}
+function show(a){const box=$('result');box.replaceChildren();if(!a){box.textContent=text[lang].none;return;}
+  const h=document.createElement('h2');h.textContent=`${a.id} · ${a[lang==='en'?'name_en':'name_zh']}`;
+  const p=document.createElement('p');p.textContent=text[lang].details(a);box.replaceChildren(h,p);
+}
+$('pick').addEventListener('click',()=>{
+  const location=$('location').value, limit=Number($('time').value), energy=$('energy').value;
+  const matches=activities.filter(a=>(location==='all'||a.location_type===location)&&a.minutes<=limit&&(energy==='all'||a.energy===energy));
+  if(!matches.length){show(null);return;}
+  const picked=matches[Math.floor(Math.random()*matches.length)]; history=[picked,...history].slice(0,5);show(picked);renderHistory();
+});
+$('reset').addEventListener('click',()=>{populate($('location'),[option('all',text[lang].all),option('indoor',text[lang].indoor),option('outdoor',text[lang].outdoor)],'all');populate($('time'),[15,30,60].map(n=>option(String(n),text[lang].minutes(n))),'30');populate($('energy'),[option('all',text[lang].all),option('low',text[lang].low),option('medium',text[lang].medium)],'all');});
+$('clear').addEventListener('click',()=>{history=[];renderHistory();});
+$('language').addEventListener('click',()=>{lang=lang==='en'?'zh':'en';render();});
+render();
+</script>
+</body>
+</html>
