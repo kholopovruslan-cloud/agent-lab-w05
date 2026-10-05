@@ -62,7 +62,7 @@ const text = {
   en: { title:'What can I do between classes?', disclaimer:'Fictional teaching activities; not an official university announcement.', language:'中文', location:'Location', time:'Available time', energy:'Energy', all:'All', indoor:'Indoor', outdoor:'Outdoor', low:'Low', medium:'Medium', minutes:n=>`${n} minutes`, pick:'Pick an activity', reset:'Reset filters', history:'Recent picks', clear:'Clear history', none:'No matching activities.', empty:'No picks yet.', details:a=>`${a.id} · ${a.minutes} min · ${a.location_type} · ${a.energy}` },
   zh: { title:'下課空檔可以做什麼？', disclaimer:'教學用虛構活動；不是大學官方公告。', language:'English', location:'地點', time:'可用時間', energy:'體力', all:'全部', indoor:'室內', outdoor:'戶外', low:'低', medium:'中', minutes:n=>`${n} 分鐘`, pick:'幫我選一個活動', reset:'重設篩選', history:'最近選擇', clear:'清除紀錄', none:'沒有符合條件的活動。', empty:'還沒有選擇紀錄。', details:a=>`${a.id} · ${a.minutes} 分鐘 · ${a.location_type==='indoor'?'室內':'戶外'} · ${a.energy==='low'?'低體力':'中體力'}` }
 };
-let lang='en', history=[];
+let lang='en', history=[], currentPick=null;
 const $=id=>document.getElementById(id);
 function option(value,label){const o=document.createElement('option');o.value=value;o.textContent=label;return o;}
 function populate(select,items,value){select.replaceChildren(...items);select.value=value;}
@@ -76,12 +76,13 @@ function render(){
   populate($('energy'),[option('all',t.all),option('low',t.low),option('medium',t.medium)],$('energy').value||'all');
   $('pick').textContent=t.pick; $('reset').textContent=t.reset; $('history-title').textContent=t.history; $('clear').textContent=t.clear;
   renderHistory();
+  if(currentPick) show(currentPick);
 }
 function renderHistory(){const t=text[lang],list=$('history');list.replaceChildren();
   if(!history.length){const li=document.createElement('li');li.textContent=t.empty;list.append(li);return;}
   for(const a of history){const li=document.createElement('li');li.textContent=`${a.id} · ${a[lang==='en'?'name_en':'name_zh']} · ${t.details(a)}`;list.append(li);}
 }
-function show(a){const box=$('result');box.replaceChildren();if(!a){box.textContent=text[lang].none;return;}
+function show(a){currentPick=a;const box=$('result');box.replaceChildren();if(!a){box.textContent=text[lang].none;return;}
   const h=document.createElement('h2');h.textContent=`${a.id} · ${a[lang==='en'?'name_en':'name_zh']}`;
   const p=document.createElement('p');p.textContent=text[lang].details(a);box.replaceChildren(h,p);
 }
